@@ -11,10 +11,10 @@ from collections import OrderedDict
 logger = logging.getLogger(__name__)
 
 def get_response(search_query, start_index=0):
-    """ pings arxiv.org API to fetch a batch of 100 papers """
+    """ pings arxiv.org API to fetch a batch of 500 papers """
     # fetch raw response
     base_url = 'http://export.arxiv.org/api/query?'
-    add_url = 'search_query=%s&sortBy=lastUpdatedDate&start=%d&max_results=100' % (search_query, start_index)
+    add_url = 'search_query=%s&sortBy=lastUpdatedDate&start=%d&max_results=500' % (search_query, start_index)
     #add_url = 'search_query=%s&sortBy=submittedDate&start=%d&max_results=100' % (search_query, start_index)
     search_query = base_url + add_url
     logger.debug(f"Searching arxiv for {search_query}")

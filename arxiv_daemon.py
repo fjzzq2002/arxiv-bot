@@ -54,15 +54,18 @@ from openai import AsyncOpenAI
 client = AsyncOpenAI(api_key=open('deepseek_api_key').read(), base_url="https://api.deepseek.com")
 
 async def get_deepseek_response(prompt):
-    response = await client.chat.completions.create(
-        model="deepseek-chat",
-        messages=[
-            {"role": "user", "content": prompt},
-        ],
-        stream=False
-    )
-    # print(prompt, response.choices[0].message.content)
-    return response.choices[0].message.content
+    try:
+        response = await client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "user", "content": prompt},
+            ],
+            stream=False
+        )
+        # print(prompt, response.choices[0].message.content)
+        return response.choices[0].message.content
+    except:
+        return ''
 
 def clean(x):
     x = x.replace('\n', ' ').replace('\t', ' ').replace('\r', ' ').strip()
@@ -81,7 +84,7 @@ async def deepseek_score(title, abstract, retry_count=3):
             match = re.search(f'{metric}: (\\d+)/10', resp)
             if match:
                 score[metric] = int(match.group(1))
-        if len(score) > len(score_maxlen):
+        if len(score) > len(score_maxlen) or (len(score) == len(score_maxlen) and len(resp) > len(best_resp)):
             score_maxlen = score
             best_resp = resp
         if len(score_maxlen) == 3:
@@ -126,7 +129,7 @@ async def run_daemon():
     # fetch the latest papers
     total_updated = 0
     zero_updates_in_a_row = 0
-    for k in range(args.start, args.start + args.num, 100):
+    for k in range(args.start, args.start + args.num, 500):
         logging.info('querying arxiv api for query %s at start_index %d' % (q, k))
 
         # attempt to fetch a batch of papers from arxiv api
@@ -136,7 +139,7 @@ async def run_daemon():
                 resp = get_response(search_query=q, start_index=k)
                 papers = parse_response(resp)
                 time.sleep(0.5)
-                if len(papers) == 100:
+                if len(papers) == 500:
                     break # otherwise we have to try again
             except Exception as e:
                 logging.warning(e)
