@@ -114,6 +114,8 @@ const Paper = props => {
                         .then(response => console.log(response.text()));
     const utags = p.utags.map((utxt, ix) => <UTag key={ix} tag={utxt} />);
     const similar_url = "/?rank=pid&pid=" + p.id;
+    const arxiv_url = `https://arxiv.org/abs/${p.id}`;
+    const scholar_url = `https://scholar.google.com/scholar?q=arXiv:${p.id}`;
     const inspect_url = "/inspect?pid=" + p.id;
     const thumb_img = p.thumb_url === '' ? null : <div class='rel_img'><img src={p.thumb_url} /></div>;
     
@@ -144,7 +146,7 @@ const Paper = props => {
     <div class='rel_paper'>
         <div class="rel_score">{p.weight.toFixed(2)}</div>
         <div class='rel_title'>
-            <a href={'http://arxiv.org/abs/' + p.id}>{renderMath(p.title)}</a>
+            <a href={'https://www.alphaxiv.org/pdf/' + p.id} target="_blank">{renderMath(p.title)}</a>
         </div>
         <div class='rel_authors'>{authorLinks}</div>
         <div class='rel_scores'>
@@ -170,7 +172,13 @@ const Paper = props => {
                 </div>
             }
         </div>
-        <div class='rel_more'><a href={similar_url}>similar</a></div>
+        <div class='rel_more'>
+            <a href={similar_url}>similar</a>
+            <span class="rel_more_separator">·</span>
+            <a href={scholar_url} target="_blank">scholar</a>
+            <span class="rel_more_separator">·</span>
+            <a href={arxiv_url} target="_blank">arxiv</a>
+        </div>
     </div>
     )
 }
