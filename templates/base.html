@@ -8,6 +8,9 @@
 <title>arxiv-sanity</title>
 <!-- CSS -->
 <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
 <!-- Favicon -->
 <link rel="shortcut icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}" />
 
@@ -32,6 +35,8 @@ var user = {{ user | tojson }};
 {% block content %}
 {% endblock %}
 
+<!-- Marked for Markdown rendering -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <!-- React -->
 <script src="https://unpkg.com/react@16/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@16/umd/react-dom.production.min.js" crossorigin></script>

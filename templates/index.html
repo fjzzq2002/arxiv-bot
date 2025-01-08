@@ -36,19 +36,12 @@ var move_page = function(int_offset) {
                 <!-- the search box, allowing us to search by keywords -->
                 <input name="q" type="text" id="qfield" value="{{ gvars.search_query }}">
 
-                <!-- rank type: one of tags, pid, time, or random -->
+                <!-- rank type: one of score or pid -->
                 <label for="rank_type">Rank by:</label>
                 <select name="rank" id="rank_select">
-                    <option value="search" {{ gvars.rank == 'search' and 'selected' }}>search</option>
-                    <option value="tags" {{ gvars.rank == 'tags' and 'selected' }}>tags</option>
+                    <option value="score" {{ gvars.rank == 'score' and 'selected' }}>score</option>
                     <option value="pid" {{ gvars.rank == 'pid' and 'selected' }}>pid</option>
-                    <option value="time" {{ gvars.rank == 'time' and 'selected' }}>time</option>
-                    <option value="random" {{ gvars.rank == 'random' and 'selected' }}>random</option>
                 </select>
-
-                <!-- current tags, simply in a text field -->
-                <label for="tags">tags: </label>
-                <input name="tags" type="text" id="tags_field" value="{{ gvars.tags }}">
 
                 <!-- current pid, simply in a text field -->
                 <label for="pid">pid: </label>
@@ -61,6 +54,21 @@ var move_page = function(int_offset) {
                 <!-- current svm_c, in a text field -->
                 <label for="svm_c">svm_c: </label>
                 <input name="svm_c" type="text" id="svm_c_field" value="{{ gvars.svm_c }}">
+
+                <!-- weights for score components -->
+                <div style="margin: 5px 0;">
+                    <label for="w_interp">w_interp: </label>
+                    <input name="w_interp" type="number" step="0.1" style="width:50px" value="{{ gvars.w_interp or '2.0' }}">
+                    
+                    <label for="w_understand">w_understand: </label>
+                    <input name="w_understand" type="number" step="0.1" style="width:50px" value="{{ gvars.w_understand or '1.5' }}">
+                    
+                    <label for="w_surprisal">w_surprisal: </label>
+                    <input name="w_surprisal" type="number" step="0.1" style="width:50px" value="{{ gvars.w_surprisal or '1.0' }}">
+                    
+                    <label for="w_author">w_author: </label>
+                    <input name="w_author" type="number" step="0.1" style="width:50px" value="{{ gvars.w_author or '3.0' }}">
+                </div>
 
                 <!-- current skip_have: one of yes or no -->
                 <label for="skip_have">skip_have: </label>
@@ -75,10 +83,9 @@ var move_page = function(int_offset) {
         <!-- some hand-coded common choices for faster and more convenient operation -->
         <div id="cbox_fast">
             Shortcuts:
-            <a href="/?rank=tags&tags=all&time_filter=7&skip_have=yes">recommend over last week</a>
-            <a href="/?rank=tags&tags=all&time_filter=3&skip_have=yes">recommend over last 3 days</a>
-            <a href="/?rank=time">recent</a>
-            <a href="/?rank=random&time_filter=7">random last week</a>
+            <a href="/?rank=score&time_filter=7&skip_have=yes">top scored this week</a>
+            <a href="/?rank=score&time_filter=3&skip_have=yes">top scored last 3 days</a>
+            <a href="/?rank=score">all time best</a>
         </div>
     </div>
     <div>

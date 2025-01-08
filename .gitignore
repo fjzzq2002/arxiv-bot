@@ -4,3 +4,8 @@ __pycache__
 data
 *.ipynb
 secret_key.txt
+bin/
+include/
+lib/
+pyvenv.cfg
+deepseek_api_key

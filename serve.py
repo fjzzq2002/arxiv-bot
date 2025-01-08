@@ -100,6 +100,8 @@ def render_pid(pid):
         utags = [t for t, pids in tags.items() if pid in pids],
         summary = d['summary'],
         thumb_url = thumb_url,
+        score = d.get('score', None),
+        scoring_result = d.get('scoring_result', None),
     )
 
 def random_rank():
@@ -202,27 +204,25 @@ def default_context():
 
 @app.route('/', methods=['GET'])
 def main():
-
     # default settings
-    default_rank = 'time'
-    default_tags = ''
+    default_rank = 'score'
     default_time_filter = ''
     default_skip_have = 'no'
 
     # override variables with any provided options via the interface
-    opt_rank = request.args.get('rank', default_rank) # rank type. search|tags|pid|time|random
-    opt_q = request.args.get('q', '') # search request in the text box
-    opt_tags = request.args.get('tags', default_tags)  # tags to rank by if opt_rank == 'tag'
+    opt_rank = request.args.get('rank', default_rank) # rank type: score|pid
+    opt_q = request.args.get('q', '') # search filter
     opt_pid = request.args.get('pid', '')  # pid to find nearest neighbors to
     opt_time_filter = request.args.get('time_filter', default_time_filter) # number of days to filter by
     opt_skip_have = request.args.get('skip_have', default_skip_have) # hide papers we already have?
     opt_svm_c = request.args.get('svm_c', '') # svm C parameter
     opt_page_number = request.args.get('page_number', '1') # page number for pagination
-
-    # if a query is given, override rank to be of type "search"
-    # this allows the user to simply hit ENTER in the search field and have the correct thing happen
-    if opt_q:
-        opt_rank = 'search'
+    
+    # get the weight parameters with default 1.0
+    w_interp = float(request.args.get('w_interp', '2.0'))
+    w_understand = float(request.args.get('w_understand', '1.5'))
+    w_surprisal = float(request.args.get('w_surprisal', '1.0'))
+    w_author = float(request.args.get('w_author', '1.0'))
 
     # try to parse opt_svm_c into something sensible (a float)
     try:
@@ -230,73 +230,107 @@ def main():
     except ValueError:
         C = 0.01 # sensible default, i think
 
-    # rank papers: by tags, by time, by random
-    words = [] # only populated in the case of svm rank
-    if opt_rank == 'search':
-        pids, scores = search_rank(q=opt_q)
-    elif opt_rank == 'tags':
-        pids, scores, words = svm_rank(tags=opt_tags, C=C)
+    # Get all papers first
+    pdb = get_papers()
+    mdb = get_metas()
+    pids = list(pdb.keys())
+    
+    # Apply search filter if query exists
+    if opt_q:
+        q_lower = opt_q.lower()
+        filtered_pids = []
+        for pid in pids:
+            p = pdb[pid]
+            # Search in title, authors, and summary
+            searchable_text = (
+                p['title'].lower() + ' ' + 
+                ' '.join(a['name'].lower() for a in p['authors']) + ' ' + 
+                p['summary'].lower()
+            )
+            if q_lower in searchable_text:
+                filtered_pids.append(pid)
+        pids = filtered_pids
+        print('filtered_pids', len(filtered_pids))
+
+    # Get initial scores based on ranking type
+    if opt_rank == 'score':
+        scores = [0 for _ in pids]
     elif opt_rank == 'pid':
-        pids, scores, words = svm_rank(pid=opt_pid, C=C)
-    elif opt_rank == 'time':
-        pids, scores = time_rank()
-    elif opt_rank == 'random':
-        pids, scores = random_rank()
+        pids_svm, scores_svm, _ = svm_rank(pid=opt_pid, C=C)
+        pids_new = []
+        scores_new = []
+        allowed_pids = set(pids)
+        for ix, pid in enumerate(pids_svm):
+            if pid in allowed_pids:
+                pids_new.append(pid)
+                scores_new.append(scores_svm[ix])
+        pids = pids_new
+        scores = scores_new
     else:
         raise ValueError("opt_rank %s is not a thing" % (opt_rank, ))
 
     # filter by time
     if opt_time_filter:
-        mdb = get_metas()
-        kv = {k:v for k,v in mdb.items()} # read all of metas to memory at once, for efficiency
         tnow = time.time()
         deltat = int(opt_time_filter)*60*60*24 # allowed time delta in seconds
-        keep = [i for i,pid in enumerate(pids) if (tnow - kv[pid]['_time']) < deltat]
-        pids, scores = [pids[i] for i in keep], [scores[i] for i in keep]
+        keep = [i for i,pid in enumerate(pids) if (tnow - mdb[pid]['_time']) < deltat]
+        pids = [pids[i] for i in keep]
+        scores = [scores[i] for i in keep]
 
     # optionally hide papers we already have
     if opt_skip_have == 'yes':
         tags = get_tags()
         have = set().union(*tags.values())
         keep = [i for i,pid in enumerate(pids) if pid not in have]
-        pids, scores = [pids[i] for i in keep], [scores[i] for i in keep]
+        pids = [pids[i] for i in keep]
+        scores = [scores[i] for i in keep]
 
+    # render all papers to just the information we need for the UI
+    papers = [render_pid(pid) for pid in pids]
+    
+    # Apply weighted scoring
+    for i, p in enumerate(papers):
+        base_score = float(scores[i])
+        if opt_rank == 'score' and p['score']:  # if we have the ML scores
+            weighted_score = base_score + (
+                w_interp * p['score'].get('Interpretability', 0) +
+                w_understand * p['score'].get('Understanding', 0) +
+                w_surprisal * p['score'].get('Surprisal', 0) +
+                w_author * 10 * p['score'].get('Reputation', 0)  # multiply by 10 since Reputation is 0/1
+            )
+            p['weight'] = weighted_score
+        else:
+            p['weight'] = base_score
+            
+    # Sort papers by weight, then by time for equal weights
+    papers.sort(key=lambda p: (-p['weight'], -mdb[p['id']]['_time']))
+    
     # crop the number of results to RET_NUM, and paginate
     try:
         page_number = max(1, int(opt_page_number))
     except ValueError:
         page_number = 1
-    start_index = (page_number - 1) * RET_NUM # desired starting index
-    end_index = min(start_index + RET_NUM, len(pids)) # desired ending index
-    pids = pids[start_index:end_index]
-    scores = scores[start_index:end_index]
-
-    # render all papers to just the information we need for the UI
-    papers = [render_pid(pid) for pid in pids]
-    for i, p in enumerate(papers):
-        p['weight'] = float(scores[i])
-
-    # build the current tags for the user, and append the special 'all' tag
-    tags = get_tags()
-    rtags = [{'name':t, 'n':len(pids)} for t, pids in tags.items()]
-    if rtags:
-        rtags.append({'name': 'all'})
+    start_index = (page_number - 1) * RET_NUM
+    papers = papers[start_index:start_index + RET_NUM]
 
     # build the page context information and render
     context = default_context()
     context['papers'] = papers
-    context['tags'] = rtags
-    context['words'] = words
-    context['words_desc'] = "Here are the top 40 most positive and bottom 20 most negative weights of the SVM. If they don't look great then try tuning the regularization strength hyperparameter of the SVM, svm_c, above. Lower C is higher regularization."
+    context['tags'] = []
+    context['words_desc'] = ""
+    context['words'] = []  # No more word weights since we removed tag search
     context['gvars'] = {}
     context['gvars']['rank'] = opt_rank
-    context['gvars']['tags'] = opt_tags
     context['gvars']['pid'] = opt_pid
     context['gvars']['time_filter'] = opt_time_filter
     context['gvars']['skip_have'] = opt_skip_have
     context['gvars']['search_query'] = opt_q
     context['gvars']['svm_c'] = str(C)
     context['gvars']['page_number'] = str(page_number)
+    context['gvars']['w_interp'] = str(w_interp)
+    context['gvars']['w_understand'] = str(w_understand)
+    context['gvars']['w_surprisal'] = str(w_surprisal)
+    context['gvars']['w_author'] = str(w_author)
     return render_template('index.html', **context)
 
 @app.route('/inspect', methods=['GET'])
