@@ -72,11 +72,11 @@ def clean(x):
     x = re.sub(r'\s+', ' ', x)
     return x
 
-async def deepseek_score(title, abstract, retry_count=3):
+async def deepseek_score(title, abstract, retry_count=10):
     prompt = prompt_deepseek.replace('$$$', clean(title)+'\n\n'+clean(abstract))
     score_maxlen = {}
     best_resp = ""
-    for _ in range(retry_count):
+    for rep in range(retry_count):
         resp = await get_deepseek_response(prompt)
         score = {}
         # try to match Interpretability: ?/10
@@ -89,6 +89,7 @@ async def deepseek_score(title, abstract, retry_count=3):
             best_resp = resp
         if len(score_maxlen) == 3:
             break
+        await asyncio.sleep(1.7**rep)
     return score_maxlen, best_resp
 
 async def get_score(paper):
